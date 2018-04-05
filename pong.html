@@ -50,6 +50,7 @@
       }
       // Pong game
       function PongGame(canvas) {
+        this.points = 0;
         this.width = canvas.width;
         this.height = canvas.height;
         this.ball = new Ball (this.width/2, this.height/2, -3, 3);
@@ -63,7 +64,12 @@
           this.ball.velocityY = 3;
         };
         this.checkGameEnd = function() {
-          if (this.player1.score >= 5 || this.player2.score >= 5) {
+          if (this.player1.score >= 5) {
+            this.player1.score = 0;
+            this.player2.score = 0;
+            this.points += 1;
+          }
+          if (this.player2.score >= 5) {
             this.player1.score = 0;
             this.player2.score = 0;
           }
@@ -116,11 +122,11 @@
 
       // Main game loop
       function draw() {
-        var ctx = document.getElementById("game_window").getContext('2d');
         // game logic
         game.Update();
-        $("#score").text(game.player1.score);
+        $("#score").text(game.points);
         // game graphics
+        var ctx = document.getElementById("game_window").getContext('2d');
         ctx.clearRect(0, 0, 800, 600);
         ctx.fillStyle = 'white';
         ctx.save();
@@ -130,6 +136,20 @@
         ctx.fillRect(game.player2.x, game.player2.y, game.player2.width, game.player2.height);
         //Ball
         ctx.fillRect(game.ball.x, game.ball.y, 10, 10);
+
+        // score and UI text
+        ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.font = '16pt Arial';
+        ctx.fillText("Game of pong.", 0, 32);
+        ctx.fillText("Use WASD to move.", 0, 64);
+        ctx.fillText("Win the game by getting 5 points", 0, 96);
+        ctx.font = '256pt Arial';
+        ctx.fillText(game.player1.score, canvas.width/8, canvas.height/2 + 124);
+        ctx.fillText(game.player2.score,canvas.width*(5/8), canvas.height/2 + 124);
+
+        for (var i = 0; i <= 10; i+=1) {
+          ctx.fillRect(canvas.width/2, 55*i + 5, 10, 40);
+        }
 
         window.requestAnimationFrame(draw);
       }
@@ -176,8 +196,8 @@
       // wants to send (displays them as an alert).
       window.addEventListener("message", function(evt) {
         if(evt.data.messageType === "LOAD") {
-          game.player1.score = evt.data.gameState.score;
-          $("#score").text(game.player1.score);
+          game.points = evt.data.gameState.score;
+          $("#score").text(game.points);
         } else if (evt.data.messageType === "ERROR") {
           alert(evt.data.info);
         }
