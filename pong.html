@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pong</title>
+  <meta charset="utf-8"/>
+  <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+  <script>
+    /* global $, alert */
+
+    $(document).ready( function() {
+      "use strict";
+
+      // Paddle for the pong game
+      function Paddle(x, y) {
+        this.score = 0;
+        this.velocity = 5;
+        this.width = 10;
+        this.height = 40;
+        this.x = x;
+        this.y = y;
+        this.moveUp = function() {
+          this.y = this.y - this.velocity;
+        }
+        this. moveDown = function() {
+          this.y = this.y + this.velocity;
+        }
+        this.collideBall = function(ball) {
+          if (Math.abs(ball.x - this.x) < this.width && Math.abs(ball.y - this.y) < this.height) {
+            return true;
+          }
+          return false;
+        }
+        this.bounceBall = function(ball) {
+
+          if (this.collideBall(ball)) {
+            ball.velocityX = - ball.velocityX;
+          }
+        }
+      }
+      // Ball for the pong game
+      function Ball(x, y, velocityX, velocityY) {
+        this.x = x;
+        this.y = y;
+        this.velocityX = velocityX;
+        this.velocityY = velocityY;
+        this.move = function() {
+          this.x = this.x + this.velocityX;
+          this.y = this.y + this.velocityY;
+        }
+      }
+      // Pong game
+      function PongGame(canvas) {
+        this.width = canvas.width;
+        this.height = canvas.height;
+        this.ball = new Ball (this.width/2, this.height/2, -3, 3);
+        this.player1 = new Paddle(10, this.height/2);
+        this.player2 = new Paddle (this.width - 10, this.height/2);
+        this.player2.velocity = this.ball.velocityY/3;
+        this.serveBall = function() {
+          this.ball.x = this.width/2;
+          this.ball.y = this.height/2;
+          this.ball.velocityX = -3;
+          this.ball.velocityY = 3;
+        };
+        this.checkGameEnd = function() {
+          if (this.player1.score >= 5 || this.player2.score >= 5) {
+            this.player1.score = 0;
+            this.player2.score = 0;
+          }
+        };
+        this.Update = function() {
+          this.player1.bounceBall(this.ball);
+          this.player2.bounceBall(this.ball);
+          this.checkGameEnd();
+          // Count score
+          if (this.ball.x <= 0) {
+            this.player2.score += 1;
+            this.serveBall();
+          };
+          if (this.ball.x >= this.width) {
+            this.player1.score += 1;
+            this.serveBall();
+          };
+          // bounce from horizontal edges
+          if (this.ball.y <= 0 || this.ball.y >= this.height) {
+            this.ball.velocityY = - this.ball.velocityY;
+          };
+          // ball movement
+          this.ball.move();
+          // player movement
+          if (keypressed[87]) {
+            this.player1.moveUp();
+          }
+          if (keypressed[83]) {
+            this.player1.moveDown();
+          }
+          // enemy movement
+          if (this.ball.y <= this.player2.y) {
+            this.player2.moveUp();
+          }
+          else {
+            this.player2.moveDown();
+          }
+        };
+      }
+      // Main function code
+      var canvas = document.getElementById("game_window");
+
+      // store keypresses to an array
+      var keypressed = [];
+      window.onkeyup = function(e) {keypressed[e.keyCode] = false;}
+      window.onkeydown = function(e) {keypressed[e.keyCode] = true;}
+
+      // Create game
+      var game = new PongGame(canvas);
+
+      // Main game loop
+      function draw() {
+        var ctx = document.getElementById("game_window").getContext('2d');
+        // game logic
+        game.Update();
+        $("#score").text(game.player1.score);
+        // game graphics
+        ctx.clearRect(0, 0, 800, 600);
+        ctx.fillStyle = 'white';
+        ctx.save();
+        // Paddle1
+        ctx.fillRect(game.player1.x, game.player1.y, game.player1.width, game.player1.height);
+        //Paddle2
+        ctx.fillRect(game.player2.x, game.player2.y, game.player2.width, game.player2.height);
+        //Ball
+        ctx.fillRect(game.ball.x, game.ball.y, 10, 10);
+
+        window.requestAnimationFrame(draw);
+      }
+      draw();
+
+      // Simulates "game over" when a score would be sent
+      $("#submit_score").click( function () {
+        var msg = {
+          "messageType": "SCORE",
+          "score": parseFloat($("#score").text())
+        };
+        window.parent.postMessage(msg, "*");
+      });
+
+      // Sends this game's state to the service.
+      // The format of the game state is decided
+      // by the game
+      $("#save").click( function () {
+        var msg = {
+          "messageType": "SAVE",
+          "gameState": {
+            "score": parseFloat($("#score").text())
+          }
+        };
+        window.parent.postMessage(msg, "*");
+      });
+
+      // Sends a request to the service for a
+      // state to be sent, if there is one.
+      $("#load").click( function () {
+        var msg = {
+          "messageType": "LOAD_REQUEST",
+        };
+        window.parent.postMessage(msg, "*");
+      });
+
+      // Listen incoming messages, if the messageType
+      // is LOAD then the game state will be loaded.
+      // Note that no checking is done, whether the
+      // gameState in the incoming message contains
+      // correct information.
+      //
+      // Also handles any errors that the service
+      // wants to send (displays them as an alert).
+      window.addEventListener("message", function(evt) {
+        if(evt.data.messageType === "LOAD") {
+          game.player1.score = evt.data.gameState.score;
+          $("#score").text(game.player1.score);
+        } else if (evt.data.messageType === "ERROR") {
+          alert(evt.data.info);
+        }
+      });
+
+      // Request the service to set the resolution of the
+      // iframe correspondingly
+      var message =  {
+        messageType: "SETTING",
+        options: {
+        	"width": 800, //Integer
+          "height": 600 //Integer
+          }
+      };
+      window.parent.postMessage(message, "*");
+
+    });
+  </script>
+  <body>
+    <canvas id=game_window  width="800" height="600" style="background-color:gray; border:1px solid black;">
+    </canvas>
+
+
+    <div><span  id="score">0</span> Points</div>
+
+    <button id="submit_score">Submit score</button><br>
+
+    <button id="save">Save</button>
+    <button id="load">Load</button>
+
+  </body>
